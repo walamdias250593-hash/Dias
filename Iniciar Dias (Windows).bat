@@ -3,6 +3,19 @@ chcp 65001 >nul
 title Dias - Assistente de Voz
 cd /d "%~dp0"
 
+if not exist server.js (
+  echo.
+  echo O Dias foi aberto de dentro do arquivo ZIP, sem extrair.
+  echo.
+  echo Faca assim:
+  echo   1. Feche esta janela e o programa do ZIP.
+  echo   2. Clique com o botao direito no arquivo ZIP e escolha "Extrair tudo" ou "Extrair aqui".
+  echo   3. Abra a pasta extraida e de dois cliques em "Iniciar Dias (Windows).bat".
+  echo.
+  pause
+  exit /b 1
+)
+
 where node >nul 2>nul
 if errorlevel 1 (
   echo O Node.js nao esta instalado.
