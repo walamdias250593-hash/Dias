@@ -273,13 +273,25 @@ async function postarApi(rota, corpo) {
   return dados;
 }
 
-const configCarregada = fetch("/api/config", { headers: { "X-Dias": "1" } })
-  .then((r) => r.json())
-  .then((cfg) => {
+const avisoServidor = document.getElementById("aviso-servidor");
+
+async function carregarConfig() {
+  try {
+    const cfg = await (await fetch("/api/config", { headers: { "X-Dias": "1" } })).json();
+    avisoServidor.hidden = true;
     ferramentasPc = new Set(cfg.ferramentasPc || []);
     precisaConfirmar = new Set(cfg.precisaConfirmar || []);
-  })
-  .catch(() => {});
+    return cfg;
+  } catch {
+    // A tela abriu pelo cache, mas o servidor não está rodando.
+    avisoServidor.hidden = false;
+    return null;
+  }
+}
+
+const configCarregada = carregarConfig().then((cfg) => {
+  if (cfg && !cfg.temChave) abrirConfiguracoes(cfg);
+});
 
 const modal = document.getElementById("confirmacao");
 const modalTitulo = document.getElementById("confirmacao-titulo");
@@ -421,3 +433,68 @@ function limparParaFala(texto) {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+// ---------- Configurações ----------
+const dialogoConfig = document.getElementById("config");
+const campoChave = document.getElementById("chave");
+const statusChave = document.getElementById("config-status");
+const botaoSalvarChave = document.getElementById("salvar-chave");
+
+async function abrirConfiguracoes(cfg) {
+  cfg = cfg || (await carregarConfig());
+  if (!cfg) return;
+  document.getElementById("config-chave").hidden = cfg.chaveDoAmbiente;
+  document.getElementById("config-ambiente").hidden = !cfg.chaveDoAmbiente;
+  botaoSalvarChave.hidden = cfg.chaveDoAmbiente;
+  document.getElementById("config-pc").textContent = cfg.acessoPc ? "ligado (com aprovação)" : "desligado";
+  statusChave.textContent = cfg.temChave ? "Chave configurada. Cole outra para trocar." : "Falta configurar a chave para o Dias responder.";
+  campoChave.value = "";
+  if (!dialogoConfig.open) dialogoConfig.showModal();
+}
+
+document.getElementById("abrir-config").addEventListener("click", () => abrirConfiguracoes());
+
+document.getElementById("fechar-config").addEventListener("click", () => dialogoConfig.close());
+
+// O botão Salvar é o "submit" do formulário, então Enter também salva.
+document.getElementById("form-config").addEventListener("submit", async (evento) => {
+  evento.preventDefault();
+  statusChave.textContent = "Testando a chave…";
+  botaoSalvarChave.disabled = true;
+  try {
+    await postarApi("/api/chave", { chave: campoChave.value });
+    statusChave.textContent = "Chave salva!";
+    setTimeout(() => dialogoConfig.close(), 600);
+    falar("Pronto! Agora é só tocar no microfone e falar comigo.");
+  } catch (erro) {
+    statusChave.textContent = erro.message;
+  } finally {
+    botaoSalvarChave.disabled = false;
+  }
+});
+
+// ---------- Aplicativo instalável ----------
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
+}
+
+const botaoInstalar = document.getElementById("instalar");
+let pedidoInstalacao = null;
+
+window.addEventListener("beforeinstallprompt", (evento) => {
+  evento.preventDefault();
+  pedidoInstalacao = evento;
+  botaoInstalar.hidden = false;
+});
+
+botaoInstalar.addEventListener("click", async () => {
+  if (!pedidoInstalacao) return;
+  pedidoInstalacao.prompt();
+  await pedidoInstalacao.userChoice;
+  pedidoInstalacao = null;
+  botaoInstalar.hidden = true;
+});
+
+window.addEventListener("appinstalled", () => {
+  botaoInstalar.hidden = true;
+});

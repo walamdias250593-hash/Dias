@@ -28,22 +28,35 @@ Fale naturalmente, por exemplo:
 
 Além disso, ele conversa sobre qualquer assunto: tira dúvidas, dá ideias, explica coisas.
 
-## Como rodar
+## Como instalar e usar
 
-1. Instale o [Node.js](https://nodejs.org) 18 ou mais novo.
-2. Crie uma chave de API em <https://platform.claude.com> (menu *API Keys*).
-3. No terminal, dentro desta pasta:
+**Só na primeira vez:**
 
-   ```bash
-   npm install
-   export ANTHROPIC_API_KEY="sua-chave-aqui"   # no Windows (PowerShell): $env:ANTHROPIC_API_KEY="sua-chave-aqui"
-   npm start
-   ```
+1. Instale o [Node.js](https://nodejs.org/pt) (versão LTS). É só avançar no instalador.
+2. Baixe o Dias: na página do projeto no GitHub, clique em **Code → Download ZIP** e extraia a pasta.
+3. Abra o atalho de acordo com o seu sistema:
+   - **Windows:** `Iniciar Dias (Windows).bat`
+   - **Mac:** `Iniciar Dias (Mac).command` (se o Mac bloquear, clique com o botão direito → Abrir)
+   - **Linux:** `iniciar-dias.sh`
 
-4. Abra <http://localhost:3000> no **Google Chrome** ou no **Microsoft Edge**.
-5. Toque no microfone, permita o acesso e fale.
+   Na primeira vez ele baixa o que precisa (leva um minuto). Depois o Dias abre em uma janela própria.
+4. Na tela de configurações, cole sua **chave da API** (crie em [platform.claude.com](https://platform.claude.com/settings/keys)) e toque em **Salvar chave**. Ela fica guardada só no seu computador, em `~/.dias/config.json`.
+5. Toque em **Instalar**, no canto da tela, para ganhar o ícone do Dias no menu Iniciar ou na área de trabalho, como um aplicativo.
+
+**No dia a dia:** abra o atalho *Iniciar Dias* e fale. Se o Dias já estiver ligado, o atalho só traz a janela de volta.
+
+**Ligar junto com o computador (Windows):** abra `Ligar com o Windows.bat` uma vez. Depois disso o Dias fica sempre pronto e é só abrir o app pelo menu Iniciar. Para desfazer, abra o arquivo de novo.
 
 Com **Conversa contínua** marcada, ele volta a ouvir sozinho depois de responder, como em uma ligação. Para interromper a fala dele, toque no microfone. Também dá para digitar.
+
+> Use o **Google Chrome** ou o **Microsoft Edge** (que já vem no Windows). O reconhecimento de voz não funciona no Firefox.
+
+### Pelo terminal (para quem prefere)
+
+```bash
+npm install
+npm start
+```
 
 ## Acesso ao computador e segurança
 
@@ -66,6 +79,8 @@ DIAS_ACESSO_PC=0 npm start
 
 - `public/` é a página: reconhece sua voz (Web Speech API, `pt-BR`), mostra a conversa e lê as respostas em voz alta.
 - `server.js` é um servidor Node pequeno que guarda a chave da API e repassa a conversa ao Claude, junto com a lista de comandos (ferramentas) que ele pode usar.
+- `janela.js` abre o Dias em uma janela de aplicativo do Chrome ou do Edge.
+- `public/manifest.webmanifest` e `public/sw.js` fazem o Dias poder ser instalado como aplicativo.
 - `pc.js` contém as ferramentas que agem no computador (comandos, arquivos, dispositivos).
 - A pesquisa e a leitura de páginas da internet são feitas pelos servidores da Anthropic (ferramentas `web_search` e `web_fetch`).
 - Quando o Claude decide usar um comando, a página executa (no navegador ou, para o PC, pelo servidor, depois da sua aprovação) e devolve o resultado para ele.
@@ -86,6 +101,8 @@ Pronto: o assistente passa a entender e executar o novo comando.
 | `PORT` | `3000` | Porta do servidor |
 | `CLAUDE_MODEL` | `claude-opus-5-5` | Modelo do Claude usado |
 | `DIAS_ACESSO_PC` | ligado | `0` desliga o acesso ao computador |
+| `DIAS_ABRIR` | ligado | `0` não abre a janela ao iniciar |
+| `ANTHROPIC_API_KEY` | — | Chave da API (no lugar da tela de configurações) |
 
 ## Observações
 

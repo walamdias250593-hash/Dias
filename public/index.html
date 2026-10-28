@@ -4,14 +4,30 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Dias — Assistente de Voz</title>
+  <meta name="theme-color" content="#4f5bd5">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icone.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icone-192.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main class="app">
     <header class="topo">
-      <h1>Dias</h1>
-      <p class="subtitulo">Seu assistente de voz</p>
+      <div class="topo-titulo">
+        <h1>Dias</h1>
+        <p class="subtitulo">Seu assistente de voz</p>
+      </div>
+      <div class="topo-botoes">
+        <button id="instalar" class="botao-icone" type="button" hidden title="Instalar como aplicativo">Instalar</button>
+        <button id="abrir-config" class="botao-icone" type="button" title="Configurações" aria-label="Configurações">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94a7.07 7.07 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7 7 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.8a.5.5 0 0 0-.49.42l-.36 2.54a7 7 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.48a.5.5 0 0 0 .12.64l2.03 1.58a7.07 7.07 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.6.22l2.39-.96c.5.38 1.05.7 1.63.94l.36 2.54c.04.24.25.42.49.42h3.8c.24 0 .45-.18.49-.42l.36-2.54a7 7 0 0 0 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/></svg>
+        </button>
+      </div>
     </header>
+
+    <div id="aviso-servidor" class="aviso" hidden>
+      O Dias não está ligado no seu computador. Abra o atalho <strong>Iniciar Dias</strong> e esta tela volta a funcionar.
+    </div>
 
     <section id="conversa" class="conversa" aria-live="polite">
       <div class="msg assistente">Oi! Toque no microfone e fale comigo. Posso pesquisar na internet, mexer no seu computador, abrir sites e programas, criar timers, salvar notas e muito mais. Antes de mudar qualquer coisa no seu PC, eu peço sua aprovação.</div>
@@ -43,6 +59,23 @@
       <div class="confirmacao-botoes">
         <button value="nao" class="recusar">Recusar</button>
         <button value="sim" class="permitir">Permitir</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="config" class="confirmacao">
+    <form id="form-config" method="dialog">
+      <h2>Configurações</h2>
+      <div id="config-chave">
+        <label for="chave">Chave da API da Anthropic</label>
+        <p class="ajuda">Crie a sua em <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">platform.claude.com</a>, copie e cole aqui. Ela fica guardada só no seu computador.</p>
+        <input id="chave" type="password" placeholder="sk-ant-..." autocomplete="off">
+        <p id="config-status" class="ajuda"></p>
+      </div>
+      <p id="config-ambiente" class="ajuda" hidden>A chave está definida pela variável ANTHROPIC_API_KEY.</p>
+      <p class="ajuda">Acesso ao computador: <strong id="config-pc">—</strong></p>
+      <div class="confirmacao-botoes">
+        <button id="fechar-config" type="button" class="recusar">Fechar</button>
+        <button id="salvar-chave" type="submit" class="permitir">Salvar chave</button>
       </div>
     </form>
   </dialog>

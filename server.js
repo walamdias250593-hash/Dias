@@ -1,8 +1,10 @@
 import http from "node:http";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Anthropic from "@anthropic-ai/sdk";
+import { abrirJanela } from "./janela.js";
 import { PC_TOOLS, PRECISA_CONFIRMAR, descreverPc, executarFerramentaPc } from "./pc.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -13,8 +15,35 @@ const MODEL = process.env.CLAUDE_MODEL || "claude-opus-5-5";
 const ACESSO_PC = process.env.DIAS_ACESSO_PC !== "0";
 const HOSTS_PERMITIDOS = new Set([`localhost:${PORT}`, `127.0.0.1:${PORT}`]);
 
-// Lê ANTHROPIC_API_KEY (ou outra credencial configurada) do ambiente.
-const client = new Anthropic();
+// A chave da API vem da variável ANTHROPIC_API_KEY ou da tela de
+// configuração do app, que a guarda em ~/.dias/config.json.
+const PASTA_CONFIG = path.join(os.homedir(), ".dias");
+const ARQUIVO_CONFIG = path.join(PASTA_CONFIG, "config.json");
+
+async function lerConfig() {
+  try {
+    return JSON.parse(await fs.readFile(ARQUIVO_CONFIG, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+async function salvarConfig(config) {
+  await fs.mkdir(PASTA_CONFIG, { recursive: true });
+  await fs.writeFile(ARQUIVO_CONFIG, JSON.stringify(config, null, 2), { mode: 0o600 });
+}
+
+const CHAVE_DO_AMBIENTE = Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
+let client = null;
+
+async function iniciarCliente() {
+  if (CHAVE_DO_AMBIENTE) {
+    client = new Anthropic();
+    return;
+  }
+  const { chaveApi } = await lerConfig();
+  client = chaveApi ? new Anthropic({ apiKey: chaveApi }) : null;
+}
 
 const SYSTEM_PROMPT = `Você é Dias, um assistente pessoal de voz. Você conversa com o usuário em português do Brasil por voz.
 
@@ -152,6 +181,8 @@ const MIME = {
   ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".webmanifest": "application/manifest+json",
 };
 
 function sendJson(res, status, body) {
@@ -179,6 +210,9 @@ async function handleChat(req, res) {
     return sendJson(res, 400, { error: "Envie um array 'messages'." });
   }
 
+  if (!client) {
+    return sendJson(res, 400, { error: "Configure sua chave da API na engrenagem, no canto da tela." });
+  }
   try {
     const response = await client.beta.messages.create({
       model: MODEL,
@@ -195,7 +229,7 @@ async function handleChat(req, res) {
     sendJson(res, 200, { content: response.content, stop_reason: response.stop_reason });
   } catch (err) {
     if (err instanceof Anthropic.AuthenticationError) {
-      return sendJson(res, 500, { error: "Chave da API inválida ou ausente. Defina ANTHROPIC_API_KEY." });
+      return sendJson(res, 401, { error: "Chave da API inválida. Confira na engrenagem, no canto da tela." });
     }
     if (err instanceof Anthropic.RateLimitError) {
       return sendJson(res, 429, { error: "Muitas requisições. Tente de novo em instantes." });
@@ -224,8 +258,42 @@ async function handlePc(req, res) {
   sendJson(res, 200, await executarFerramentaPc(nome, input));
 }
 
+async function handleChave(req, res) {
+  if (CHAVE_DO_AMBIENTE) {
+    return sendJson(res, 400, { error: "A chave está definida pela variável ANTHROPIC_API_KEY." });
+  }
+  let chave;
+  try {
+    chave = String((await readJson(req)).chave || "").trim();
+  } catch {
+    return sendJson(res, 400, { error: "JSON inválido" });
+  }
+  if (!chave) return sendJson(res, 400, { error: "Cole a chave da API." });
+
+  // Confere a chave com uma chamada que não gasta tokens.
+  const teste = new Anthropic({ apiKey: chave });
+  try {
+    await teste.models.retrieve(MODEL);
+  } catch (err) {
+    if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
+      return sendJson(res, 400, { error: "Essa chave não funcionou. Confira se copiou ela inteira." });
+    }
+    if (err instanceof Anthropic.APIConnectionError) {
+      return sendJson(res, 502, { error: "Sem conexão com a Anthropic. Verifique sua internet." });
+    }
+    if (!(err instanceof Anthropic.NotFoundError)) {
+      return sendJson(res, 502, { error: `Não consegui testar a chave: ${err.message}` });
+    }
+  }
+  await salvarConfig({ ...(await lerConfig()), chaveApi: chave });
+  client = teste;
+  sendJson(res, 200, { ok: true });
+}
+
 function sendConfig(res) {
   sendJson(res, 200, {
+    temChave: Boolean(client),
+    chaveDoAmbiente: CHAVE_DO_AMBIENTE,
     acessoPc: ACESSO_PC,
     ferramentasPc: ACESSO_PC ? PC_TOOLS.map((t) => t.name) : [],
     precisaConfirmar: [...PRECISA_CONFIRMAR],
@@ -255,23 +323,41 @@ async function serveStatic(req, res) {
   }
 }
 
-http
-  .createServer((req, res) => {
+const URL_APP = `http://localhost:${PORT}`;
+// Defina DIAS_ABRIR=0 para não abrir a janela ao iniciar.
+const ABRIR_JANELA = process.env.DIAS_ABRIR !== "0";
+
+await iniciarCliente();
+
+const servidor = http.createServer((req, res) => {
     if (req.url.startsWith("/api/")) {
       if (!pedidoConfiavel(req)) return sendJson(res, 403, { error: "Pedido não autorizado." });
       if (req.method === "POST" && req.url === "/api/chat") return handleChat(req, res);
       if (req.method === "POST" && req.url === "/api/pc") return handlePc(req, res);
       if (req.method === "GET" && req.url === "/api/config") return sendConfig(res);
+      if (req.method === "POST" && req.url === "/api/chave") return handleChave(req, res);
       return sendJson(res, 404, { error: "Rota inexistente." });
     }
     if (req.method === "GET") return serveStatic(req, res);
     res.writeHead(405).end();
-  })
-  // Só aceita conexões do próprio computador: o servidor executa comandos.
-  .listen(PORT, "127.0.0.1", () => {
-    console.log(`Assistente Dias rodando em http://localhost:${PORT}`);
-    console.log(ACESSO_PC ? "Acesso ao computador: LIGADO (com confirmação na tela)" : "Acesso ao computador: desligado");
-    if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) {
-      console.warn("Aviso: ANTHROPIC_API_KEY não está definida. O assistente não vai conseguir responder.");
-    }
-  });
+});
+
+servidor.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    // O Dias já está aberto: só mostra a janela de novo.
+    console.log(`O Dias já está rodando em ${URL_APP}.`);
+    if (ABRIR_JANELA) abrirJanela(URL_APP);
+    setTimeout(() => process.exit(0), 1000);
+    return;
+  }
+  throw err;
+});
+
+// Só aceita conexões do próprio computador: o servidor executa comandos.
+servidor.listen(PORT, "127.0.0.1", () => {
+  console.log(`Assistente Dias rodando em ${URL_APP}`);
+  console.log(ACESSO_PC ? "Acesso ao computador: LIGADO (com confirmação na tela)" : "Acesso ao computador: desligado");
+  if (!client) console.log("Falta a chave da API: configure na engrenagem, na tela do app.");
+  console.log("Para fechar o Dias, feche esta janela.");
+  if (ABRIR_JANELA) abrirJanela(URL_APP);
+});
