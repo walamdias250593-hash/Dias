@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dias — Assistente de Voz</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <header class="topo">
+      <h1>Dias</h1>
+      <p class="subtitulo">Seu assistente de voz</p>
+    </header>
+
+    <section id="conversa" class="conversa" aria-live="polite">
+      <div class="msg assistente">Oi! Toque no microfone e fale comigo. Posso abrir sites, pesquisar, tocar músicas no YouTube, criar timers, salvar notas e muito mais.</div>
+    </section>
+
+    <p id="status" class="status">Pronto</p>
+
+    <div class="controles">
+      <button id="mic" class="mic" type="button" aria-label="Falar">
+        <svg viewBox="0 0 24 24" width="36" height="36" aria-hidden="true"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/></svg>
+      </button>
+      <label class="continuo">
+        <input id="continuo" type="checkbox" checked>
+        Conversa contínua
+      </label>
+    </div>
+
+    <form id="form-texto" class="form-texto">
+      <input id="texto" type="text" placeholder="Ou digite aqui…" autocomplete="off">
+      <button type="submit">Enviar</button>
+    </form>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

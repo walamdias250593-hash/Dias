@@ -1,0 +1,16 @@
+{
+  "name": "dias-assistente-de-voz",
+  "version": "1.0.0",
+  "description": "Assistente de IA com chat por voz que obedece comandos (Claude + Web Speech API)",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0"
+  }
+}
