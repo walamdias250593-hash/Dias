@@ -258,7 +258,80 @@ const ferramentas = {
   },
 };
 
-function executarFerramenta(bloco) {
+// ---------- Ferramentas do computador (executadas pelo servidor) ----------
+let ferramentasPc = new Set();
+let precisaConfirmar = new Set();
+
+async function postarApi(rota, corpo) {
+  const resposta = await fetch(rota, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Dias": "1" },
+    body: JSON.stringify(corpo),
+  });
+  const dados = await resposta.json().catch(() => ({}));
+  if (!resposta.ok) throw new Error(dados.error || `Erro ${resposta.status}`);
+  return dados;
+}
+
+const configCarregada = fetch("/api/config", { headers: { "X-Dias": "1" } })
+  .then((r) => r.json())
+  .then((cfg) => {
+    ferramentasPc = new Set(cfg.ferramentasPc || []);
+    precisaConfirmar = new Set(cfg.precisaConfirmar || []);
+  })
+  .catch(() => {});
+
+const modal = document.getElementById("confirmacao");
+const modalTitulo = document.getElementById("confirmacao-titulo");
+const modalMotivo = document.getElementById("confirmacao-motivo");
+const modalDetalhe = document.getElementById("confirmacao-detalhe");
+
+function pedirConfirmacao(bloco) {
+  const { name, input } = bloco;
+  const textos = {
+    executar_comando: () => ["Executar comando no seu PC?", input.motivo, input.comando],
+    escrever_arquivo: () => ["Salvar arquivo no seu PC?", input.caminho, String(input.conteudo).slice(0, 2000)],
+    abrir_no_pc: () => ["Abrir no seu PC?", "", input.alvo],
+  };
+  const [titulo, motivo, detalhe] = textos[name]?.() || [`Permitir ${name}?`, "", JSON.stringify(input)];
+  modalTitulo.textContent = titulo;
+  modalMotivo.textContent = motivo || "";
+  modalDetalhe.textContent = detalhe || "";
+  setStatus("Aguardando sua aprovação…");
+  return new Promise((resolve) => {
+    modal.onclose = () => resolve(modal.returnValue === "sim");
+    modal.showModal();
+  });
+}
+
+async function executarFerramentaPc(bloco) {
+  if (precisaConfirmar.has(bloco.name) && !(await pedirConfirmacao(bloco))) {
+    adicionarAcao("Ação recusada por você");
+    return { type: "tool_result", tool_use_id: bloco.id, content: "O usuário recusou esta ação.", is_error: true };
+  }
+  const nomes = {
+    executar_comando: `Executando: ${bloco.input.comando}`,
+    dispositivos_conectados: "Verificando os dispositivos conectados",
+    listar_pasta: `Vendo a pasta ${bloco.input.caminho}`,
+    ler_arquivo: `Lendo ${bloco.input.caminho}`,
+    escrever_arquivo: `Salvando ${bloco.input.caminho}`,
+    abrir_no_pc: `Abrindo ${bloco.input.alvo}`,
+  };
+  adicionarAcao(nomes[bloco.name] || bloco.name);
+  setStatus("Trabalhando no seu PC…");
+  const { ok, texto } = await postarApi("/api/pc", { nome: bloco.name, input: bloco.input });
+  return { type: "tool_result", tool_use_id: bloco.id, content: texto || "(sem saída)", is_error: !ok };
+}
+
+async function executarFerramenta(bloco) {
+  await configCarregada;
+  if (ferramentasPc.has(bloco.name)) {
+    try {
+      return await executarFerramentaPc(bloco);
+    } catch (erro) {
+      return { type: "tool_result", tool_use_id: bloco.id, content: `Erro: ${erro.message}`, is_error: true };
+    }
+  }
   const funcao = ferramentas[bloco.name];
   if (!funcao) {
     return { type: "tool_result", tool_use_id: bloco.id, content: `Ferramenta desconhecida: ${bloco.name}`, is_error: true };
@@ -272,15 +345,16 @@ function executarFerramenta(bloco) {
 }
 
 // ---------- Conversa com o Claude ----------
-async function chamarClaude() {
-  const resposta = await fetch("/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages: historico }),
-  });
-  const dados = await resposta.json().catch(() => ({}));
-  if (!resposta.ok) throw new Error(dados.error || `Erro ${resposta.status}`);
-  return dados;
+function chamarClaude() {
+  return postarApi("/api/chat", { messages: historico });
+}
+
+function mostrarUsoDaInternet(content) {
+  for (const bloco of content) {
+    if (bloco.type !== "server_tool_use") continue;
+    if (bloco.name === "web_search") adicionarAcao(`Pesquisando na internet: ${bloco.input?.query ?? ""}`);
+    if (bloco.name === "web_fetch") adicionarAcao(`Lendo página: ${bloco.input?.url ?? ""}`, bloco.input?.url);
+  }
 }
 
 async function enviar(texto) {
@@ -294,10 +368,11 @@ async function enviar(texto) {
 
   let textoParaFalar = "";
   try {
-    for (let rodada = 0; rodada < 10; rodada++) {
+    for (let rodada = 0; rodada < 30; rodada++) {
       const { content, stop_reason } = await chamarClaude();
       // Devolve o conteúdo completo (inclusive blocos de raciocínio) no próximo turno.
       historico.push({ role: "assistant", content });
+      mostrarUsoDaInternet(content);
 
       if (stop_reason === "refusal") {
         textoParaFalar = "Desculpe, não posso ajudar com isso.";
@@ -311,12 +386,18 @@ async function enviar(texto) {
         textoParaFalar = textos;
       }
 
+      // Pesquisa na internet longa: o servidor da Anthropic pede para continuar.
+      if (stop_reason === "pause_turn") continue;
+
       const pedidos = content.filter((b) => b.type === "tool_use");
       if (stop_reason !== "tool_use" || pedidos.length === 0) break;
 
       setStatus("Executando comando…");
-      // Todos os resultados vão juntos em uma única mensagem.
-      historico.push({ role: "user", content: pedidos.map(executarFerramenta) });
+      // Um de cada vez (cada um pode pedir aprovação); todos os resultados
+      // vão juntos em uma única mensagem.
+      const resultados = [];
+      for (const pedido of pedidos) resultados.push(await executarFerramenta(pedido));
+      historico.push({ role: "user", content: resultados });
       setStatus("Pensando…");
     }
   } catch (erro) {

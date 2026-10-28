@@ -14,7 +14,7 @@
     </header>
 
     <section id="conversa" class="conversa" aria-live="polite">
-      <div class="msg assistente">Oi! Toque no microfone e fale comigo. Posso abrir sites, pesquisar, tocar músicas no YouTube, criar timers, salvar notas e muito mais.</div>
+      <div class="msg assistente">Oi! Toque no microfone e fale comigo. Posso pesquisar na internet, mexer no seu computador, abrir sites e programas, criar timers, salvar notas e muito mais. Antes de mudar qualquer coisa no seu PC, eu peço sua aprovação.</div>
     </section>
 
     <p id="status" class="status">Pronto</p>
@@ -34,6 +34,18 @@
       <button type="submit">Enviar</button>
     </form>
   </main>
+
+  <dialog id="confirmacao" class="confirmacao">
+    <form method="dialog">
+      <h2 id="confirmacao-titulo">Permitir?</h2>
+      <p id="confirmacao-motivo"></p>
+      <pre id="confirmacao-detalhe"></pre>
+      <div class="confirmacao-botoes">
+        <button value="nao" class="recusar">Recusar</button>
+        <button value="sim" class="permitir">Permitir</button>
+      </div>
+    </form>
+  </dialog>
   <script src="app.js"></script>
 </body>
 </html>

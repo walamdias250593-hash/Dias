@@ -85,3 +85,20 @@ body {
   padding: 12px 18px; border-radius: 10px; border: none;
   background: var(--primaria); color: #fff; font-size: 1rem; cursor: pointer;
 }
+.confirmacao {
+  border: none; border-radius: 16px; padding: 20px;
+  width: min(560px, calc(100vw - 32px));
+  background: var(--card); color: var(--texto);
+}
+.confirmacao::backdrop { background: rgba(0, 0, 0, 0.55); }
+.confirmacao h2 { margin: 0 0 8px; font-size: 1.2rem; }
+.confirmacao pre {
+  background: var(--assistente); padding: 12px; border-radius: 10px;
+  max-height: 40vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.confirmacao-botoes { display: flex; gap: 8px; justify-content: flex-end; }
+.confirmacao-botoes button {
+  padding: 12px 18px; border-radius: 10px; border: none; font-size: 1rem; cursor: pointer;
+}
+.permitir { background: var(--primaria); color: #fff; }
+.recusar { background: var(--assistente); color: var(--texto); }
